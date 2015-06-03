@@ -4,6 +4,7 @@ import html.parser
 import http.cookiejar
 import urllib.request
 import urllib.parse
+import urllib.error
 
 
 class PageParser(html.parser.HTMLParser):
@@ -46,11 +47,11 @@ class LoginHandler:
 		print("Logging in...")
 		
 		global opener
-		cookies = http.cookiejar.MozillaCookieJar('cookies-test.txt') #<-- Cookies
+		cookies = http.cookiejar.MozillaCookieJar('cookies.txt') #<-- Cookies
 		try:
 			cookies.load()
 			opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies)) #<-- Cookie-aware url opener	
-		except http.cookiejar.LoadError as e:
+		except http.cookiejar.LoadError as error:
 			opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies)) #<-- Cookie-aware url opener  
 			self.requestLogin(cookies)
 		
@@ -59,12 +60,15 @@ class LoginHandler:
 		
 class ImageDownloader:
 	def getLinks(self, url):
-		request = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-		response = opener.open(request)
-		html = response.read()
-		
-		parser = PageParser()
-		parser.feed(str(html))
+		try:
+			request = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+			response = opener.open(request)
+			html = response.read()
+			
+			parser = PageParser()
+			parser.feed(str(html))
+		except urllib.error.HTTPError as error:
+			print("Error downloading links")
 	
 	def getPageLinks(self, url):
 		global links
@@ -84,13 +88,17 @@ class ImageDownloader:
 		print("Total of ",len(links)," images...")
 		
 		for i in range(0, len(links)):
-			print("Downloading ",i," of ",len(links),"...")
-			request = urllib.request.Request(links[i], headers={'User-Agent': 'Mozilla/5.0'})
-			response = opener.open(request)
-			html = response.read()
-			
-			parser = ImageParser()
-			parser.feed(str(html))
+			try:
+				print("Downloading ",i," of ",len(links),"...")
+				request = urllib.request.Request(links[i], headers={'User-Agent': 'Mozilla/5.0'})
+				response = opener.open(request)
+				html = response.read()
+				
+				parser = ImageParser()
+				parser.feed(str(html))
+			except urllib.error.HTTPError as error:
+				print("Error downloading asset")
+				continue
 		
 		print("Downloading completed")
 	
