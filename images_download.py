@@ -1,11 +1,13 @@
 #!/usr/bin/python
 
 import html.parser
-import http.cookiejar
 import urllib.request
+import http.cookiejar
 import urllib.parse
-import urllib.error
+import re
 
+from html.parser import HTMLParser
+from html.entities import name2codepoint
 
 class PageParser(html.parser.HTMLParser):
 	def handle_starttag(self, tag, attr):
@@ -13,7 +15,6 @@ class PageParser(html.parser.HTMLParser):
 			for item in attr:
 				if item[0].lower() == "href" and item[1].startswith("/view/"):
 					links.append("http://www.test.net/full/"+item[1].split('/')[2]+"/")
-
 
 class ImageParser(html.parser.HTMLParser):
 	imgUrl = ""
@@ -28,98 +29,95 @@ class ImageParser(html.parser.HTMLParser):
 				self.imgUrl = "http:" + self.imgUrl
 			urllib.request.urlretrieve(self.imgUrl, fileName)
 
+def init():
+	global targetPage
+	targetPage = input('Page to download? (favorites/gallery)')
+	if targetPage.lower() == "favourites":
+		targetPage = "favorites"
+	
+	global targetUrl
+	targetUrl = "http://www.test.net/" + targetPage + "/" + input('User page to download? ')
+	
+	confirm = input('Download contents of ' + targetUrl + "? (Y/N/abort)")
+	if confirm.lower() == "y" or confirm.lower() == "yes":
+		getCookie()
+		getPageLinks(targetUrl)
+		parseLinks()
+	elif confirm.lower() == "n" or confirm.lower() == "no":
+		init()
+	else:
+		print("Aborting")
 
-class LoginHandler:		
-	def requestLogin(self, cookies):
-		opener.addheaders = [('User-Agent', 'Mozilla/5.0')]		
-		params = urllib.parse.urlencode({'action': 'login', 'login': 'Login', 'name': 'test_screenscraper', 'pass': '302b2a2e40', 'retard_protection': 1})
-		request = urllib.request.Request("https://www.test.net/login/", bytes(params, 'utf-8'))
+def getCookie():
+	print("Logging in...")
+	global opener
+	cookies = http.cookiejar.MozillaCookieJar('cookies-test.txt') #<-- Cookies
+	try:
+		cookies.load()
+		opener  = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies)) #<-- Cookie-aware url opener	
+	except http.cookiejar.LoadError as e:
+		opener  = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies)) #<-- Cookie-aware url opener  
+		login(cookies)
+	print("Done.")
+
+def login(cookies):
+	opener.addheaders = [('User-Agent', 'Mozilla/5.0')]
+	res = opener.open("https://www.test.net/login/")
+	if res.status != 200:
+		raise "Login failed"
+	headers = res.getheaders()
+	for a,b in headers:
+		if a == 'Set-Cookie':
+			cookie = b
+	res.read()
+	
+	params = urllib.parse.urlencode({'action': 'login', 'login': 'Login', 'name': 'test_screenscraper', 'pass': '302b2a2e40'})
+	req = urllib.request.Request("https://www.test.net/login/", bytes(params, 'utf-8'))
+	res = opener.open(req)
+	if res.geturl() == 'http://www.test.net/':
+		res.read()
+		cookies.save()
+	else:
+		res.read()
+		raise "Login failed"
+
+def getPageLinks(url):
+	global links
+	links = []
+	i = 1
+	pageLinks = getLinks(url + "/" + str(i) + "/")
+	prevLinks = 0
+	print("Reading in ",len(links)," assets...")
+	
+	# while len(links) > prevLinks:
+		# prevLinks = len(links)
+		# i += 1
+		# pageLinks = getLinks(url + "/" + str(i) + "/")
+		# print("Reading in ",len(links)," assets...")
+	return
+
+def getLinks(url):
+	request = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+	response = opener.open(request)
+	html = response.read()
+	
+	parser = PageParser()
+	parser.feed(str(html))
+	return
+	
+def parseLinks():
+	print("Total of ",len(links)," images...")
+	
+	for i in range(0, len(links)):
+		print("Downloading ",i," of ",len(links),"...")
+		request = urllib.request.Request(links[i], headers={'User-Agent': 'Mozilla/5.0'})
 		response = opener.open(request)
+		html = response.read()
 		
-		if response.geturl() == 'http://www.test.net/':
-			response.read()
-			cookies.save()
-		else:
-			response.read()
-			raise "Login failed"
+		parser = ImageParser()
+		parser.feed(str(html))
 	
-	def __init__(self):
-		print("Logging in...")
-		
-		global opener
-		cookies = http.cookiejar.MozillaCookieJar('cookies.txt') #<-- Cookies
-		try:
-			cookies.load()
-			opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies)) #<-- Cookie-aware url opener	
-		except http.cookiejar.LoadError as error:
-			opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies)) #<-- Cookie-aware url opener  
-			self.requestLogin(cookies)
-		
-		print("Done.")
+	print("Downloading completed")
+	return
 
-		
-class ImageDownloader:
-	def getLinks(self, url):
-		try:
-			request = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-			response = opener.open(request)
-			html = response.read()
-			
-			parser = PageParser()
-			parser.feed(str(html))
-		except urllib.error.HTTPError as error:
-			print("Error downloading links")
-	
-	def getPageLinks(self, url):
-		global links
-		links = []
-		i = 1
-		pageLinks = self.getLinks(url + "/" + str(i) + "/")
-		prevLinks = 0
-		print("Reading in ",len(links)," assets...")
-		
-		while len(links) > prevLinks:
-			prevLinks = len(links)
-			i += 1
-			pageLinks = self.getLinks(url + "/" + str(i) + "/")
-			print("Reading in ",len(links)," assets...")
-	
-	def parseLinks(self):
-		print("Total of ",len(links)," images...")
-		
-		for i in range(0, len(links)):
-			try:
-				print("Downloading ",i," of ",len(links),"...")
-				request = urllib.request.Request(links[i], headers={'User-Agent': 'Mozilla/5.0'})
-				response = opener.open(request)
-				html = response.read()
-				
-				parser = ImageParser()
-				parser.feed(str(html))
-			except urllib.error.HTTPError as error:
-				print("Error downloading asset")
-				continue
-		
-		print("Downloading completed")
-	
-	def __init__(self):
-		global targetPage
-		targetPage = input('Page to download? (favorites/gallery)')
-		if targetPage.lower() == "favourites":
-			targetPage = "favorites"
-		
-		global targetUrl
-		targetUrl = "http://www.test.net/" + targetPage + "/" + input('User page to download? ')
-		
-		confirm = input('Download contents of ' + targetUrl + "? (Y/N/abort)")
-		if confirm.lower() == "y" or confirm.lower() == "yes":
-			login = LoginHandler()
-			self.getPageLinks(targetUrl)
-			self.parseLinks()
-		elif confirm.lower() == "n" or confirm.lower() == "no":
-			self.__init__()
-		else:
-			print("Aborting")
-
-
-imageDownloader = ImageDownloader()
+init()
