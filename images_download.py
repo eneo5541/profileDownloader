@@ -1,18 +1,17 @@
 #!/usr/bin/python
 
-from urllib.request import Request, urlopen
-from html.parser import HTMLParser
+import html.parser
 import urllib.request
 import os
 
-class FavouritePageParser(HTMLParser):
+class FavouritePageParser(html.parser.HTMLParser):
 	def handle_starttag(self, tag, attr):
 		if tag.lower() == "a":
 			for item in attr:
 				if item[0].lower() == "href" and item[1].startswith("/view/"):
 					links.append("http://www.test.net/full/"+item[1].split('/')[2]+"/")
 
-class ImagePageParser(HTMLParser):
+class ImagePageParser(html.parser.HTMLParser):
 	def handle_starttag(self, tag, attr):
 		if tag.lower() == "img":
 			if attr[0][0] == "id" and attr[0][1] == "submissionImg" and attr[3][0] == "src":
@@ -30,8 +29,14 @@ def init():
 	global destination
 	destination = input('Destination for images? ')
 	
-	getFavouriteLinks(targetUrl)
-	parseLinks()
+	confirm = input('Download contents of ' + targetUrl + " to " + destination + ". Y/N/Abort?")
+	if confirm.lower() == "y" or confirm.lower() == "yes":
+		getFavouriteLinks(targetUrl)
+		parseLinks()
+	elif confirm.lower() == "n" or confirm.lower() == "no":
+		init()
+	else:
+		print("Aborting")
 
 def getFavouriteLinks( url ):
 	i = 1
@@ -47,8 +52,8 @@ def getFavouriteLinks( url ):
 	return
 
 def getLinks( url ):
-	request = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-	response = urlopen(request)
+	request = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+	response = urllib.request.urlopen(request)
 	html = response.read()
 	
 	parser = FavouritePageParser()
@@ -57,11 +62,11 @@ def getLinks( url ):
 	
 def parseLinks():
 	print("Total of ",len(links)," images...")
-	print(destination)
+	
 	for i in range(0, len(links)):
 		print("Downloading ",i," of ",len(links),"...")
-		request = Request(links[i], headers={'User-Agent': 'Mozilla/5.0'})
-		response = urlopen(request)
+		request = urllib.request.Request(links[i], headers={'User-Agent': 'Mozilla/5.0'})
+		response = urllib.request.urlopen(request)
 		html = response.read()
 		
 		parser = ImagePageParser()
