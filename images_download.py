@@ -20,22 +20,30 @@ class ImagePageParser(HTMLParser):
 				fileName = imgUrl.split('/')[-1]
 				if imgUrl.startswith("//"):
 					imgUrl = "http:" + imgUrl
-					
-				path = "C:/Users/Eric/Desktop/images_script"
-				fullfilename = os.path.join(path, fileName)
+				
+				fullfilename = os.path.join(destination, fileName)
 				urllib.request.urlretrieve(imgUrl, fullfilename)
+
+def init():
+	global targetUrl
+	targetUrl = "http://www.test.net/faves/" + input('User favourites to download? ')
+	global destination
+	destination = input('Destination for images? ')
+	
+	getFavouriteLinks(targetUrl)
+	parseLinks()
 
 def getFavouriteLinks( url ):
 	i = 1
 	pageLinks = getLinks(url + "/" + str(i) + "/")
 	prevLinks = 0
+	print("Reading in ",len(links)," assets...")
 	
-	print("> ",len(links),"-",prevLinks)
 	# while len(links) > prevLinks:
 		# prevLinks = len(links)
 		# i += 1
 		# pageLinks = getLinks(url + "/" + str(i) + "/")
-		# print(i," t ",len(links),"-",prevLinks);
+		# print("Reading in ",len(links)," assets...")
 	return
 
 def getLinks( url ):
@@ -48,19 +56,22 @@ def getLinks( url ):
 	return
 	
 def parseLinks():
-	if len(links) == 0:
-		return
+	print("Total of ",len(links)," images...")
+	print(destination)
+	for i in range(0, len(links)):
+		print("Downloading ",i," of ",len(links),"...")
+		request = Request(links[i], headers={'User-Agent': 'Mozilla/5.0'})
+		response = urlopen(request)
+		html = response.read()
+		
+		parser = ImagePageParser()
+		parser.feed(str(html))
 	
-	request = Request(links[0], headers={'User-Agent': 'Mozilla/5.0'})
-	response = urlopen(request)
-	html = response.read()
-	
-	parser = ImagePageParser()
-	parser.feed(str(html))
+	print("Downloading completed")
 	return
 
 
 global links
 links = []
-getFavouriteLinks('http://www.test.net/faves/test')
-parseLinks()
+
+init()
